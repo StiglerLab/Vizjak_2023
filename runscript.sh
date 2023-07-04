@@ -1,0 +1,1 @@
+./particles --origin -384,-384,-384 --boxsize=768,768,768 --grid=16,16,16 --diffusion=8e5 --nparticles=2637 --nsteps=500000 --timestep=2e-8 --init_box=1,6.8,13 --writeinterval=25000 --LJ_epsilon=1.4 --E=4.93,5.80,8.47 --output=./init.traj --Hooke_R0=16 --Rem_R0=16 --LJ_R0=16 --Hooke_k=15.0 --atp=0.00003 --khyd=60 --krelease=30 --chainbox --frap=0 --nspparticles=440
