@@ -1,0 +1,141 @@
+* MD simulations
+This is a 3D particle simulator that integrates the Langevin
+equation. The provided binary for Linux systems requires a CUDA capable card with compute capability sm_61 or higher.
+To speed up simulation, as much as possible is done on a
+GPU. To further improve performance, all interactions are truncated at a maximum distance and interactions are evaluated on a grid, where
+each particle only interacts with particles in the same grid cell and
+adjacent grid cells.
+
+Generally, the more grid cells are used the better the performance. However, the grid size in each dimension needs to be a power of
+two, and at least 4 grid cells per dimensions are required. In
+addition, the size of a grid cell must be larger than the cutoff
+distance.
+
+* Energy models
+The system currently implements two energy models.
+** Modified Lennard-Jones potential
+This is a standard Lennard-Jones 12-6 potential with two modifications:  
+- A cutoff, above which the potential is zero
+- A linear interpolation from a pre-defined position to the cutoff,
+      to avoid jumps in the potential
+- A linear extension from a pre-defined position to x=0 to prevent
+      very high forces
+
+** Hooke potential
+A standard Hooke potential with a spring constant. It is mostly
+    intended to implement Rouse models, i.e. to connect particles into chains.
+
+** Getting started
+To get started execute:  
+#+BEGIN_SRC shell
+./runscript.sh
+#+END_SRC
+
+This will generate a condensate formed by 169 chains of 13 nucleosomes each and 440 remodelers and saves it to the file ~init.traj~.
+
+This file can be opened in IGOR Pro 8 (see Analysis/Simulations).
+
+** Usage
+To get information on usage and see options, execute
+#+BEGIN_SRC shell
+./particles --help
+#+END_SRC
+
+** Parameters
+*** Simulation box
+   The simulation box is defined by the parameters ~--origin=X,Y,Z~
+    (in nm), ~--boxsize=X,Y,Z~ (in nm) and ~--grid=X,Y,Z~ (all
+    integers). Periodic boundary conditions are turned off with
+    ~--nopbc~, if required.
+*** Run parameters
+    The simulation will run for ~--nsteps=N~ steps, of length
+    ~--timestep=T~ seconds. It incorporates ~--nparticles=N~ particles
+    and writes coordinates to the file ~--output=FILENAME~ every
+    ~--writeinterval=N~ steps.
+
+    For reproducibility testing, a random seed can be set with
+    ~--randomseed=N~. However, because of floating point instability,
+    the trajectories are not truly reproducible, even if this setting
+    is set, for long trajectories.
+
+    If no output file name is given, the output is written to
+    ~output.traj~.
+
+*** Simulation parameters
+   The Langevin diffusion coefficient is defined by ~--diffusion=X~
+    (in nm^2/s).  
+
+Energy parameters for Rouse chain connections can be specified by
+     ~--Hooke_k=X~ (in pN/nm) and ~-Hooke_R0=X~ (in nm).  
+
+All Lennard-Jones potentials share an equilibrium distance that is set by ~--LJ_R0=X~ (in nm).  
+
+The equilibrium distance R0 of Hooke and Lennard-Jones potential
+    is currently set equal. The cutoff distance is 3*R0.
+
+The strength of the Lennard-Jones potential between two nucleosomes is set by ~--LJ_epsilon=E~ (in kT).
+
+**** Remodelers
+Remodelers are currently simulated as explicit /special particles/.
+Define the number of remodelers with ~--nspparticles=X~. *Note:* The
+number of particles ~nparticles~ is the number of nucleosomes plus the
+number of remodelers.
+
+Remodelers currently follow a three-state cyclic Markov process
+(Unbound -> ATP bound -> hydrolyzed -> ...), where the ATP binding is
+diffusion limited with a provided ATP concentration ~--atp=X~ in units
+of (M). The hydrolysis rate is given by ~--khyd=X~ in units of (1/s).
+The ADP release rate is given by ~--krelease=X~ in units of (1/s).
+
+Remodeler-nucleosome interactions are modeled as Lennard-Jones potentials with strengths ~--E=NS1,NS2,S~ (in kT) for the three different possible interactions.
+~NS1~ is the weaker low affinity interaction encountered in the nucleotide-free remodeler state, ~NS2~ is the stronger low affinity interaction in the ADP-bound state, and ~S~ is the high affinity interaction in all nucleotide states.
+
+*** Initialization
+There are currently three different ways to get initial positions of particles
+
+**** Gaussian initial positions
+     With the option ~--init_gauss=N,SEP~, the starting configuration
+     is a set of ~N~ gaussian clusters, ~SEP~ nanometers apart along
+     the x-axis. Positions are chosen randomly.
+
+**** Box initial positions
+     With the option ~--init_box=N,SEP,SIDE~, the starting
+     configuration is a box-grid of ~N~ clusters, ~SEP~ nm apart,
+     where the side length of the z-dimension of the box of each
+     cluster is ~SIDE~. For ~SIDE=-1~, it is chosen automatially.
+
+     With a box configuration it is easy to define Rouse
+     connections. Define ~--chainbox~ and stretches of ~SIDE~
+     particles will be joined together.
+
+**** Read from file
+     The option ~--init_file=N,SEP,F,FILE~ allows loading initial
+     positions from the trajectory file ~FILE~. This configuration is
+     replicated ~N~ times, ~SEP~ nm apart. To specify a particular
+     frame, set ~F~ to the frame number ~F=-1~ indicates the last
+     frame.
+
+     *Note* that if the file contains M particles, ~--nparticles~ must
+     be set to N*M.
+
+*** Switches
+    The switch ~--frap=N~ sorts all particles along the x-axis at time
+    step ~N~. This is intended to de-mix the particles for calculating
+    FRAP mixing times.
+
+* Important notes
+- Choose the time step as small as possible. Large time steps
+  introduce fluidity that does not really exist.
+- The linear interpolation of the Lennard-Jones potential toward zero
+  prevents large "kicks" to a particle when they approach too
+  far. This allows for bigger time steps. However, also artifacts may
+  be introduced. Under certain circumstances, if the maximal repulsive
+  force is too small, the droplet may be crushed. The output variable
+  ~NcloseDist~ counts the number of particles that are currently
+  closer than 0.51 nm.
+- Higher diffusion coefficients require smaller time steps.
+- Because of the grid method, Rouse (Hooke) connections between
+  particles may break if particles separate further than the cutoff
+  distance. To keep track of this,the program continually outputs
+  ~Nrouse~, i.e. the number of Rouse connections that are currently
+  established vs the number that is expected.
